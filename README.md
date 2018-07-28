@@ -1,7 +1,7 @@
 # 📦 Table of Contents
 
 * [Java](/java)
-  - [OCP](/ocp)
+  - [OCP](/OCP)
 * [Angular](/angular)
 * [Database](/database)
 * [Command line](/cli)
