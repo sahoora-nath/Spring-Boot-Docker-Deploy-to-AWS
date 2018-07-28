@@ -91,7 +91,7 @@ Objective: Operate on file and directory paths by using the Paths class.
 - Files : This class contains static methods that work with `Path` objects. Uses `Path` object as parameter.
 - File : it's been around since the beginning. `File` and `Path` objects know how to convert each other.
 
-![Alt Files Path Relationship](images/filespathrel.png)
+![Alt Files Path Relationship](../images/filespathrel.png)
 
 :fireworks: `Files` and `File` despite similarity in names, these objects don't know each other.
 
