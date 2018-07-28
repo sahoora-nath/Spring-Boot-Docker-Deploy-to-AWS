@@ -108,7 +108,7 @@ Files.createDirectories(dir); //create directories if not exists
 Files.createFile(p1);
 System.out.println(Files.exists(p1));
 ```
-#### I/O vs NIO2
+### I/O vs NIO2
 
 | Description   | I/O           | NIO2  |
 | ------------- |:-------------| :----- |
@@ -117,7 +117,7 @@ System.out.println(Files.exists(p1));
 | Create directories including any missing parent directories | File f = new File("a/b/c"); f.mkdirs();      |    Path path = Paths.get("a/b/c"); Files.createDirectories(path); |
 | Check if a file or directory exists | File f = new File("test.txt"); f.exists();      |    Path path = Paths.get("test.txt"); Files.exists(path); |
 
-#### Copying, Moving and Deleting files.
+### Copying, Moving and Deleting files.
 ```Java
 Path one = Paths.get("foo/file1.txt"); //exists
 Path two = Paths.get("foo/file2.txt"); //exists
@@ -126,7 +126,7 @@ Path targ = Paths.get("foo/file12.txt"); //doesn't yet exist
 Files.copy(one, targ);
 Files.copy(two, targ); //oops, java.nio.file.FileAlreadyExistsException: foo/file12.txt
 ```
-When Java see it's about to override the file, it throws FileAlreadyExistsException as we haven't provided any option incase the file is about to replaced.
+When Java see it's about to override the file, it throws _FileAlreadyExistsException_ as we haven't provided any option incase the file is about to replaced.
 
 ```Java
 Files.copy(two, targ, StandardCopyOption.REPLACE_EXISTING);
@@ -135,4 +135,45 @@ Similarly, while trying to delete a file which doesn't exist, `NoSuchFileExcepti
 We can safeguard this by using
 ```Java
 Files.deleteIfExists(path);
+```
+### Retrieving information about a Path
+The Path interface defines a bunch of methods that return useful information about the path.
+
+```Java
+Path path = Paths.get("/home/java/workspace.note");
+System.out.println("getFaileName(): " + path.getFileName());
+System.out.println("getName(1): " + path.getName(1));
+System.out.println(("getNameCount(): "+ path.getNameCount()));
+System.out.println("getParent(): "+path.getParent());
+System.out.println("getRoot(): "+path.getRoot());
+System.out.println(("subpath(0,2): " + path.subpath(0, 2)));
+System.out.println(("toString()" + path.toString()));
+```
+This produces the following output.
+```console
+getFaileName(): workspace.note
+getName(1): java
+getNameCount(): 3
+getParent(): /home/java
+getRoot(): /
+subpath(0,2): home/java
+toString()/home/java/workspace.note
+```
+Another interesting fact about `Path` interface is it extends from `Iterable<Path>`, hence we can iterate with enhance `for` loop.
+
+```Java
+int spaces = 1;
+Path myPath = Paths.get("tmp", "dir1", "dir2", "dir3", "file.txt");
+for (Path subPath : myPath) {
+    System.out.format("%" + spaces + "s%s%n", "", subPath);
+    spaces +=2;
+}
+```
+which produces the following output:
+```console
+tmp
+  dir1
+    dir2
+      dir3
+        file.txt
 ```
