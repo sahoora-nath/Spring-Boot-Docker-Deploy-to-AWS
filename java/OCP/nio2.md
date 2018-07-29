@@ -177,3 +177,107 @@ tmp
       dir3
         file.txt
 ```
+### Resolving a Path (combining two `Path`)
+```Java
+Path dir = Paths.get("/home/java");
+Path file = Paths.get("models/Model.java");
+Path result = dir.resolve(file);
+System.out.println("Result: " + result);
+```
+This produces the absolute path by merging two paths.
+```console
+Result: /home/java/models/Model.java
+```
+
+:fireworks: `resolve` will not check that the directory or file actually exists.
+
+:tada: **Exam Note:**
+resolve() methods comes in two falvours. One with a `Path` parameter and the other with a `String` parameter. The tricky part here is that null is avalid value for both a `Path` and `String`. What will happen if you pass `null` as a parameter ?
+
+![Resolve Path](../images/resolvepath.png)
+
+The compiler can't decide which method to invoke; hence the code **won't compile**.
+
+The following example will _compile without any problem_; because the compiler knows which method to invoke.
+```java
+Path path = Paths.get("/use/bin");
+Path other = null;
+path.resolve(other);
+
+path.resolve((String) null);
+```
+### Relativizing a Path
+`Relativize` is just opposite of `resolve`.
+`path1.relativize(path2)` means _**give me a path that shows how to go path2 from path1**_
+
+```Java
+Path dir = Paths.get("/home/java");
+Path music = Paths.get("/home/java/country/gana.mp3");
+Path mp3 = dir.relativize(music);
+System.out.println(mp3);
+```
+The output is
+```console
+country/gana.mp3
+```
+Now we can try some complex example:
+```Java
+Path absolute1 = Paths.get("/home/java");
+Path absolute2 = Paths.get("/usr/local");
+Path absolute3 = Paths.get("/home/java/temp/music.mp3");
+Path relative1 = Paths.get("temp");
+Path relative2 = Paths.get("temp/music.pdf");
+System.out.println("1: "+ absolute1.relativize(absolute3));
+System.out.println("2: "+ absolute3.relativize(absolute1));
+System.out.println("3: "+ absolute1.relativize(absolute2));
+System.out.println("4: "+ relative1.relativize(relative2));
+```
+The output is
+```console
+1: temp/music.mp3
+2: ../..
+3: ../../usr/local
+4: music.pdf
+```
+:tada: Remember `relativize()` and `resolve()` are opposite. Just like `resolve()`, `relativize()` does not check that the path actually exists.
+
+### DirectoryStream
+DirectoryStream works like `dir` command in DOS and the `ls` command in UNIX. It can look only one directory. i.e. we have the following directory.
+/home
+  | - users
+          |  -  vafi
+          |  -  eyra
+
+
+```Java
+Path dir = Paths.get("/home/users");
+try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+    //try-with-resources, so we don't have to close the stream explicitly.
+    for (Path path : stream) {
+        System.out.println(path);
+    }
+}
+```
+The output is
+```console
+vafi
+eyra
+```
+Suppose we want to know the name of directory whose name starts with `v` or `w`.
+- "v" or "w" followed  by anything
+```java
+Path dir = Paths.get("/home/users");
+try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "[vw]*")) {
+    //try-with-resources, so we don't have to close the stream explicitly.
+    for (Path path : stream) {
+        System.out.println(path);
+    }
+}
+```
+This time the output is
+```console
+vafi
+```
+:tada: The `*` is a wildcard that means ZERO or more of any characters. Notice this is not a regular expression. DirectoryStream uses something called `glob`.
+
+### FileVisitor
