@@ -241,14 +241,17 @@ The output is
 ```
 :tada: Remember `relativize()` and `resolve()` are opposite. Just like `resolve()`, `relativize()` does not check that the path actually exists.
 
+*********************************************
 ### DirectoryStream
 DirectoryStream works like `dir` command in DOS and the `ls` command in UNIX. It can look only one directory. i.e. we have the following directory.
+```console
 /home
   | - users
           |  -  vafi
           |  -  eyra
 
-
+```
+and DirectoryStream is used to get the list by the following code.
 ```Java
 Path dir = Paths.get("/home/users");
 try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -281,3 +284,274 @@ vafi
 :tada: The `*` is a wildcard that means ZERO or more of any characters. Notice this is not a regular expression. DirectoryStream uses something called `glob`.
 
 ### FileVisitor
+FileVisitor look at subdirectories.
+Java provides a `SimpleFileVisitor`. You extend it and override one or more methods. Then you call `Files.walkFileTree`, which recursively look through directory structure and call method on `Visitor` subclass. i.e. we have the following directory structure and you want to delete all class files.
+```console
+/home
+  | - src
+        | - Test.java
+        | - Test.class
+        | - dir
+              | - AnotherTest.java
+              | - AnotherTest.class
+```
+```Java
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+
+public class RemoveClassFiles extends SimpleFileVisitor<Path> {
+
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        if (file.getFileName().endsWith(".class")) {
+            Files.delete(file);
+        }
+        return FileVisitResult.CONTINUE;
+    }
+
+    public static void main(String[] args) throws IOException {
+        RemoveClassFiles dirs = new RemoveClassFiles();
+        Files.walkFileTree(Paths.get("/home/src"), dirs);
+    }
+}
+```
+- This is a simple `FileVisitor` having one method override `visitFile()`. This method is invoked for every file in the directory structure. It checks the extension of file and delete if appropriate. In our case it deletes two class files.
+- If you notice there are two parameter to `visitFile()`. One is the `path` object and the other one is `BasicFileAttributes` interface - which let you find if the current file is a directory and many other similar piece of data.
+- Finally `visitFile()` returns `FileVisitResult.CONTINUE` which tell the method that it should keep looking through directory structure.
+
+Let's look at another callback method of `SimpleFileVisitor` class. That is `preVisitDirectory()` and all other methods.
+Suppose the file directory structure as follows:
+```console
+/home
+    | - a.txt
+    | - emptyChild
+    | - child
+          | - b.txt
+          | - grandChild
+                  | - c.txt
+```
+```Java
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+
+public class PrintDirs extends SimpleFileVisitor<Path> {
+
+    @Override
+    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+        System.out.println("pre: " + dir);
+        return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        System.out.println("file: " + file);
+        return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+        return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+        System.out.println("post: " + dir);
+        return FileVisitResult.CONTINUE;
+    }
+
+    public static void main(String[] args) throws IOException {
+        PrintDirs dirs = new PrintDirs();
+        Files.walkFileTree(Paths.get("/home"), dirs);
+    }
+}
+```
+This might get the following output.
+```console
+pre: /home
+file: /home/a.txt
+pre: /home/child
+file: /home/child/b.txt
+pre: /home/child/grandChild
+file: /home/child/grandChild/c.txt
+post: /home/child/grandChild
+post: /home/child
+pre: /home/emptyChild
+post: /home/emptyChild
+post: /home
+```
+:fireworks: Note that Java goes down as deep as it can before returning back up the tree. This is called _**deep-first search**_. we said "might" because files and directories at the same level can get visited in either order.
+
+Now suppose we change the return type in `preVisitDirectory()` as 'FileVisitResult.SKIP_SUBTREE'as follows:
+```Java
+@Override
+public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+    System.out.println("pre: " + dir);
+    String name = dir.getFileName().toString();
+    if (name.equals(dir)) {
+        return FileVisitResult.SKIP_SUBTREE;
+    }
+    return FileVisitResult.CONTINUE;
+}
+```
+Now the output is
+```console
+pre: /home
+file: /home/a.txt
+pre: /home/child
+pre: /home/emptyChild
+post: /home/emptyChild
+post: /home
+```
+This skips the entire child subtree; we don't see the file `b.txt` or it's subdirectory: `grandchildren`; also we don't see the `post` visit call.
+
+
+ Now if we change the return value from `FileVisitResult.SKIP_SUBTREE` to `FileVisitResult.SKIP_TERMINATE`. The output will be
+ ```console
+ pre: /home
+ file: /home/a.txt
+ pre: /home/child
+ ```
+So as soon as the child directory came up, the program stops walking the tree.
+
+Now we need to see the behaviour if the return type is changed to `FileVisitResult.SKIP_SIBLINGS`?
+The output is same as previous example
+```console
+pre: /home
+file: /home/a.txt
+pre: /home/child
+```
+`SKIP_SIBLINGS` is a combination of `SKIP_SUBTREE` and don't look in any folder at the same level.
+
+### WatchService
+Observe the changes in a directory by using the WatchService interface.
+
+Suppose we have the following directory structure
+```console
+/foo
+  | - bar
+  | - other
+  | - file1.txt
+```
+and we want to keep the watch service for delete entry on `bar` directory.
+
+```Java
+import java.io.IOException;
+import java.nio.file.*;
+
+public class WatchOnDelete {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        Path dir = Paths.get("foo");
+
+        WatchService watcher = FileSystems.getDefault().newWatchService();
+        dir.register(watcher, StandardWatchEventKinds.ENTRY_DELETE);
+
+        WatchKey key;
+        while(true) {
+            key = watcher.take();
+
+            for(WatchEvent<?> event : key.pollEvents()) {
+                WatchEvent.Kind<?> kind = event.kind();
+
+                System.out.println(kind.name());
+                System.out.println(kind.type());
+                System.out.println(event.context());
+
+                String name = event.context().toString();
+                if (name.equals("bar")) {
+                    System.out.println("Directory now deleted, now we can proceed!!!");
+                    return; // end the program; we found what we were waiting for.
+                }
+            }
+            key.reset(); // keep looking for events
+        }
+    }
+}
+```
+This will wait until `bar` directory is deleted. Once deleted, the following o/p will print on console.
+```console
+ENTRY_DELETE
+interface java.nio.file.Path
+bar
+Directory now deleted, now we can proceed!!!
+```
+The basic flow of `WatchService`:
+- Create a new `WatchService`
+- Register it on a `Path` listing to one or more events.
+- Loop until you are no longer interested in these events.
+- Get a `WatchKey` from the `WatchService`
+- Call 'key.pollEvents' and do something with the events.
+- Call 'key.reset()' to look for more events.
+
+You can register multiple events on `WatchService` as follows:
+```java
+dir1.register(watcher, ENTRY_DELETE);
+dir2.register(watcher, ENTRY_DELETE, ENTRY_CREATE);
+dir3.register(watcher, ENTRY_DELETE, ENTRY_CREATE, DELETE_MODIFY);
+```
+
+Within the loop, you need to get a `WatchKey`. There are two ways to do this.
+```Java
+watcher.take(); // wait "forever" for the event
+watcher.poll(); //get event if present right now.
+watcher.poll(10, TimeUnit.SECONDS); //wait up-to 10 seconds.
+watcher.poll(1, TimeUnit.MINUTES); //wait up-to 1 minute for an event.
+```
+Finally, we call `key.reset()`. This is very important. If we forget to call reset, the program will work for the first event, but then you will not be notified for any other events.
+:fireworks: `WatchService` only watches the files and directories immediately beneath it.
+
+### How Serialization Affects Inheritance
+If you are a serializable class but your superclass is not serializable, then any instance varibales you inherit from superclass will be rest to the values they were given during the original construction of the object. This is because the `non-serializable` class `constructor` will run.
+
+```java
+import java.io.*;
+
+public class SuperNotSerial {
+    public static void main(String[] args) {
+        Dog d = new Dog("Fido", 35);
+        System.out.println("Before: " + d.name + " " + d.weight);
+
+        //Serialize
+        try {
+            FileOutputStream fs = new FileOutputStream("test.ser");
+            ObjectOutputStream os = new ObjectOutputStream(fs);)
+            os.writeObject(d);
+            os.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        //deserialize
+        try {
+            FileInputStream fi = new FileInputStream("test.ser");
+            ObjectInputStream ois = new ObjectInputStream(fi);
+            d = (Dog) ois.readObject();
+
+            ois.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("After: " + d.name + " " + d.weight);
+    }
+}
+
+
+class Dog extends Animal implements Serializable {
+    String name;
+    Dog(String name, int weight) {
+        this.name = name;
+        this.weight = weight; //inherited.
+    }
+}
+
+class Animal { // not serializable
+    int weight = 42;
+}
+```
+which produces the output:
+```console
+Before: Fido 35
+After: Fido 42
+```
+:tada: Static varibales are never saved as part of the object's state..because they do not belongs to the object!
