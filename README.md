@@ -2,6 +2,7 @@
 
 * [Java](/java)
   - [OCP](/java/OCP)
+  - [Design Pattern](/java/design_pattern)
 * [Angular](/angular)
 * [Database](/database)
 * [Command line](/cli)

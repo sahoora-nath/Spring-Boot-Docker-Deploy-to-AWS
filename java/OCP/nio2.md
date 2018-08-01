@@ -555,3 +555,10 @@ Before: Fido 35
 After: Fido 42
 ```
 :tada: Static varibales are never saved as part of the object's state..because they do not belongs to the object!
+
+### The java.io.Console class
+The `Console` class makes it easy to accept input from the command line, both echoed and non-echoed(such as password).
+- You can get `Console` instance using `System.getConsole()`. There are two methods to capture the input.
+- `readLine()`: returns a string containing whatever the user keys in.
+- `readPassword()`: This method doesn't return a String; it returns a character array.
+Here is the reason for this: Once you have got the password, you can verify it and then absolutely remove it from memory. If a `String` is returned, it could exist in a poll somewhere in memory and perhaps some hacker could find it.
